@@ -102,11 +102,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Welcome */}
-      <div>
-        <h2 className="text-xl font-bold text-neutral-900">
-          Welcome back, {profile?.display_name ?? 'there'}
-        </h2>
-        <p className="text-sm text-neutral-500 mt-0.5">Here's your study progress overview.</p>
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-neutral-900">
+            Welcome back, {profile?.display_name ?? 'there'}
+          </h2>
+          <p className="text-sm text-neutral-500 mt-0.5">Here's your study progress overview.</p>
+        </div>
+        <video
+          src="/video_202607111755.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl opacity-40 shadow-sm flex-shrink-0"
+        />
       </div>
 
       {/* Stats row */}
