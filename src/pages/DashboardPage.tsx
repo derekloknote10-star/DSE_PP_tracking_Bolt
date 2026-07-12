@@ -115,7 +115,7 @@ export default function DashboardPage() {
           loop
           muted
           playsInline
-          className="w-200 h-20 sm:w-24 sm:h-24 object-cover rounded-xl opacity-40 shadow-sm flex-shrink-0"
+          className="w-200 h-20 sm:w-200 sm:h-24 object-cover rounded-xl opacity-40 shadow-sm flex-shrink-0"
 //            className="h-full w-auto object-cover rounded-xl opacity-40 shadow-sm"
         />
       </div>
