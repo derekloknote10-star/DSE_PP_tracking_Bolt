@@ -146,13 +146,12 @@ export default function DashboardPage() {
           <p className="text-sm text-neutral-500 mt-0.5">Here's your study progress overview.</p>
         </div>
         <video
-          src="/video_202607111755.mp4"
+          src="/i_want_a_series_of_animated_gi-ezgif.com-mute-video.mp4"
           autoPlay
           loop
           muted
           playsInline
-          className="w-200 h-20 sm:w-200 sm:h-24 object-cover rounded-xl opacity-40 shadow-sm flex-shrink-0"
-//            className="h-full w-auto object-cover rounded-xl opacity-40 shadow-sm"
+          className="h-20 sm:h-24 w-auto object-cover rounded-xl opacity-40 shadow-sm flex-shrink-0"
         />
       </div>
 
