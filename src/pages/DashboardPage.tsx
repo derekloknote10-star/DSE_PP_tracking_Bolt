@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { Target, FileText, BookOpen, TrendingUp, ChevronRight, Clock, ChevronDown } from 'lucide-react';
 import { differenceInDays, isAfter, isBefore } from 'date-fns';
-import type { Subject, PastPaper, TopicSet, Target as TargetType, TargetItem } from '../types';
+import type { Subject, PastPaper, TopicSet, Target as TargetType, TargetItem, MathP2QuestionResult, PaperStatus } from '../types';
 
 const YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
 
@@ -18,6 +18,26 @@ const PAPERS_PER_SUBJECT: Record<string, number[]> = {
   econ: [1, 2],
   phy:  [1, 2],
 };
+
+const MATH_P2_TOTAL_QUESTIONS = 45;
+
+function getPaperProgress(
+  paper: PastPaper | undefined,
+  subjectId: string,
+  year: number,
+  paperNumber: number,
+  mathP2Results: MathP2QuestionResult[]
+): { pct: number; tagged: number; status: PaperStatus } {
+  const status: PaperStatus = paper?.status ?? 'not_started';
+  if (subjectId === 'math' && paperNumber === 2) {
+    const tagged = mathP2Results.filter(
+      (r) => r.year === year && (r.result === 'right' || r.result === 'wrong')
+    ).length;
+    return { pct: Math.round((tagged / MATH_P2_TOTAL_QUESTIONS) * 100), tagged, status };
+  }
+  const pct = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
+  return { pct, tagged: 0, status };
+}
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -61,6 +81,16 @@ export default function DashboardPage() {
     enabled: !!user,
   });
 
+  const { data: mathP2 = [] } = useQuery<MathP2QuestionResult[]>({
+    queryKey: ['math-p2-questions', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('math_p2_question_results').select('*');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: targetItems = [] } = useQuery<TargetItem[]>({
     queryKey: ['target-items', user?.id],
     queryFn: async () => {
@@ -82,15 +112,21 @@ export default function DashboardPage() {
   });
 
   const subjectReadiness = subjects.map((s) => {
-    const subjectPapers = papers.filter((p) => p.subject_id === s.id);
-    const completed = subjectPapers.filter((p) => p.status === 'completed').length;
     const paperNums = PAPERS_PER_SUBJECT[s.id] ?? [1, 2];
     const total = YEARS.length * paperNums.length;
+    let progressSum = 0;
+    for (const year of YEARS) {
+      for (const n of paperNums) {
+        const p = papers.find((pp) => pp.subject_id === s.id && pp.year === year && pp.paper_number === n);
+        progressSum += getPaperProgress(p, s.id, year, n, mathP2).pct;
+      }
+    }
+    const paperPct = total > 0 ? Math.round(progressSum / total) : 0;
     const sets = topicSets.filter((ts) => ts.subject_id === s.id);
     const setsCompleted = sets.filter((ts) => ts.status === 'completed').length;
-    const paperPct = total > 0 ? Math.round((completed / total) * 100) : 0;
     const setPct = sets.length > 0 ? Math.round((setsCompleted / sets.length) * 100) : 0;
-    const pct = Math.round((paperPct + setPct) / 2);
+    const pct = sets.length > 0 ? Math.round((paperPct + setPct) / 2) : paperPct;
+    const completed = papers.filter((p) => p.subject_id === s.id && p.status === 'completed').length;
     return { id: s.id, name: s.name, pct, paperPct, setPct, completed, total };
   });
 
@@ -154,7 +190,7 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Subject Readiness Vibe Check */}
-        <SubjectVibeCheck subjects={subjectReadiness} papers={papers} />
+        <SubjectVibeCheck subjects={subjectReadiness} papers={papers} mathP2Results={mathP2} />
 
         {/* Active targets */}
         <div className="card p-5">
@@ -260,9 +296,10 @@ const STATUS_ICON: Record<string, { icon: string; label: string; cls: string }> 
   completed:    { icon: '🟢', label: 'Done!',       cls: 'text-success-600' },
 };
 
-function SubjectVibeCheck({ subjects, papers }: {
+function SubjectVibeCheck({ subjects, papers, mathP2Results }: {
   subjects: { id: string; name: string; pct: number; paperPct: number; setPct: number; completed: number; total: number }[];
   papers: PastPaper[];
+  mathP2Results: MathP2QuestionResult[];
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -322,12 +359,33 @@ function SubjectVibeCheck({ subjects, papers }: {
                             const p = papers.find(
                               (pp) => pp.subject_id === s.id && pp.year === year && pp.paper_number === n
                             );
-                            const status = p?.status ?? 'not_started';
-                            const info = STATUS_ICON[status];
+                            const prog = getPaperProgress(p, s.id, year, n, mathP2Results);
+                            const isMathP2 = s.id === 'math' && n === 2;
+                            const colorCls = prog.pct === 0
+                              ? 'text-neutral-400'
+                              : prog.pct < 50 ? 'text-amber-600'
+                              : prog.pct < 100 ? 'text-primary-600'
+                              : 'text-success-600';
+                            const barCls = prog.pct === 0
+                              ? 'bg-neutral-300'
+                              : prog.pct < 50 ? 'bg-amber-400'
+                              : prog.pct < 100 ? 'bg-primary-500'
+                              : 'bg-success-500';
                             return (
-                              <span key={n} className={`text-center font-medium ${info.cls}`}>
-                                {info.icon} {info.label}
-                              </span>
+                              <div key={n} className="flex flex-col items-center gap-1 py-0.5">
+                                <span className={`text-xs font-bold ${colorCls}`}>{prog.pct}%</span>
+                                <div className="w-full max-w-[3rem] bg-neutral-200 rounded-full h-1 overflow-hidden">
+                                  <div
+                                    className={`h-1 rounded-full transition-all duration-500 ${barCls}`}
+                                    style={{ width: `${prog.pct}%` }}
+                                  />
+                                </div>
+                                {isMathP2 ? (
+                                  <span className="text-[10px] text-neutral-400">{prog.tagged}/{MATH_P2_TOTAL_QUESTIONS} Q</span>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-400">{STATUS_ICON[prog.status].label}</span>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
